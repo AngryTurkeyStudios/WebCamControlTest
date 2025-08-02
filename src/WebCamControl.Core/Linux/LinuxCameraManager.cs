@@ -23,7 +23,8 @@ public class LinuxCameraManager : ICameraManager, IDisposable
 	private readonly Lazy<IReadOnlyList<ICamera>> _cameras;
 
 	private const string _v4lDeviceDir = "/sys/class/video4linux";
-	private static readonly string[] _preferredDeviceNames = ["Insta360 Link","Insta360 Link 2"];
+	//TODO get the EXACT name of the Insta360 Link or change the logic at line 91
+	private static readonly string[] _preferredDeviceNames = ["Insta360 Link", "Insta360 Link 2: Insta360 Link "]; 
 
 	public LinuxCameraManager(
 		IOptionsMonitor<Config> config,
@@ -91,25 +92,20 @@ public class LinuxCameraManager : ICameraManager, IDisposable
 			var preferredCam = cameras.FirstOrDefault(x => _preferredDeviceNames.Contains(x.Name));
 			if (preferredCam != null)
 			{
+				_cameraLogger.LogInformation($"Selected preferred camera: '{preferredCam?.Name}' as its in the list of supported cameras");
 				return preferredCam;
 			}
-			
-			foreach (var cam in cameras)
-    Console.WriteLine($"Camera found: {cam.Name}");
 
-
+			// 3. Choose highest resolution camera
 			var chosenCamera = cameras
-			.Select(x => new {
-				Camera = x,
-				MaxResolution = x.VideoModes.Any() ? x.VideoModes.Max(y => y.Width * y.Height) : 0
-			})
-			.OrderByDescending(x => x.MaxResolution)
-			.Select(x => x.Camera)
-			.FirstOrDefault();
+				.OrderByDescending(x => x.VideoModes?.Any() == true
+					? x.VideoModes.Max(y => y.Width * y.Height)
+					: 0)
+				.First();
 
-		Console.WriteLine($"Selected camera: {chosenCamera?.Name ?? "None"}");
+			_cameraLogger.LogInformation($"No preferred camera found, Selected camera: {chosenCamera?.Name ?? "None"} due to its high resolution");
 
-		return chosenCamera;
+			return chosenCamera;
 
 		}
 		set
